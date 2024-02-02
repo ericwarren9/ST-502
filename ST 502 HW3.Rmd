@@ -1,0 +1,235 @@
+---
+title: "ST 502 Homework 3 Problem 8.43"
+author: "Eric Warren"
+date: "`r Sys.Date()`"
+urlcolor: blue
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.pos = "H", out.extra = "")
+options(scipen = 999)
+```
+
+```{r output setup, eval=FALSE, echo=FALSE}
+# This code allows us to render a pdf document
+rmarkdown::render("~/ST-502/ST 502 HW3.Rmd", 
+              output_format = "pdf_document", 
+              output_options = list(
+                toc = TRUE, 
+                toc_depth = 3,
+                number_sections = TRUE,
+                extra_dependencies = "float"
+                )
+              )
+```
+
+# Background
+
+The file `gamma-arrivals` contains another set of gamma-ray data, this one consisting of the times between arrivals (interarrival times) of 3,935 photons (units are seconds).
+
+# Read in the data
+
+Here we are going to read in our data for analysis purposes.
+```{r read in}
+library(tidyverse)
+library(MASS)
+
+(df <- read_csv("gamma-arrivals.csv", col_names = "times"))
+```
+
+# Part A
+
+Make a histogram of the interarrival times. Does it appear that a gamma distribution would be a plausible model?
+
+First we are going to make our histogram.
+```{r hist}
+df %>%
+  ggplot(aes(x = times)) +
+  geom_histogram(color = "red",
+                 bins = 20) +
+  labs(title = "Distribution of Photon Travel Times",
+       x = "Time in Seconds",
+       y = "Frequency",
+       caption = "Eric Warren") +
+  theme_bw()
+```
+
+This "skewed right" distribution definitely looks like something that could be a gamma distribution. We have seen something like this before of pictures in the textbook of a shape similar to this. We will investigate more in-depth if that is an appropriate distribution.
+
+# Part B
+
+Fit the parameters by the method of moments and by maximum likelihood. How do the estimates compare?
+
+## Method of Moments
+
+First let us take a look at Method of Moments. We know from our class lecture that the Method of Moment Estimators are $\hat{\alpha}_{MOM} = \frac{\bar{Y}^2}{S^2}$ and $\hat{\lambda}_{MOM} = \frac{\bar{Y}}{S^2}$. We can use that to get the estimates for our gamma distribution below.
+```{r mom estimates}
+# Find ybar (sample mean)
+ybar <- mean(df$times)
+
+# Find s2 (biased version of sample variance)
+s2 <- mean(df$times^2) - ybar^2
+
+# Now get alpha_hat = ybar^2 / s2
+alpha_hat <- ybar^2 / s2
+
+# Now get lambda_hat = ybar / s2
+lambda_hat <- ybar / s2
+
+# Show the parameter estimates together
+c(alpha_hat, lambda_hat)
+```
+
+Through Method of Moments Estimation we can see that our estimators are $\hat{\alpha}_{MOM} =$ `r alpha_hat` and $\hat{\lambda}_{MOM} =$ `r lambda_hat`. 
+
+## Maximum Likelihood Estimation
+
+Now let us take a look at Maximum Likelihood Estimation. We can find our Maximum Likelihood Estimators $\hat{\alpha}_{MLE}$ and $\hat{\lambda}_{MLE}$ by using the `MASS::fitdistr()` function in R. We can use that to get the estimates our shape and rate for our gamma distribution below.
+```{r mle}
+fitdistr(df$times, "gamma")[[1]]
+
+# Save the shape (alpha) estimate
+alpha_mle <- fitdistr(df$times, "gamma")[[1]][[1]]
+
+# Save the rate (lambda) estimate
+lambda_mle <- fitdistr(df$times, "gamma")[[1]][[2]]
+```
+
+As we can see our shape also known as $\hat{\alpha}_{MLE}$ is equal to `r alpha_mle` and our rate also known as $\hat{\lambda}_{MLE}$ is equal to `r lambda_mle`. 
+
+# Part C
+
+Plot the two fitted gamma densities on top of the histogram. Do the fits look reasonable?
+
+Let us take a look to see how our estimates (both Method of Moments and Maximum Likelihood Estimation) are looking compared to our histogram from before.
+```{r hist 2}
+#Show histogram
+hist(df$times, 
+     xlab = "Time in Seconds", 
+     ylab = "Density", 
+     main = "Histogram of Photon Travel Time",
+     freq = FALSE
+     )
+# Show MOM estimation
+curve(dgamma(x,
+             shape = alpha_hat,
+             rate = lambda_hat
+             ),
+      from = 0,
+      to = 600,
+      add = TRUE,
+      col = "red"
+      )
+# Show MLE estimation
+curve(dgamma(x,
+             shape = alpha_mle,
+             rate = lambda_mle
+             ),
+      from = 0,
+      to = 600,
+      add = TRUE,
+      col = "blue"
+      )
+# Make legend
+legend(400, 0.008, 
+       legend=c("MOM", "MLE"),
+       col=c("red", "blue"), 
+       lty = 1, cex = 0.8,
+       title = "Estimation Types"
+       )
+```
+
+After plotting our Method of Moments and Maximum Likelihood Estimation estimated parameters for a gamma distribution on top of our histogram of data, we can see that the fit for both is pretty good. While both estimated distributions extend much higher vertically at their point, it seems the data mirrors the distribution pretty well. Note how the Method of Moment (MOM on the graph legend) and Maximum Likelihood Estimation (MLE on the graph legend) both provide very similar estimators for this gamma distribution which is why it might be hard to see the difference between them. All in all, both seem like good fits for our data.
+
+# Part D
+
+For both maximum likelihood and the method of moments, use the bootstrap to estimate the standard errors of the parameter estimates. How do the estimated standard errors of the two methods compare?
+
+Please note for both maximum likelihood and the method of moments we are going to use the bootstrap with a $N = 10000$.
+
+## Method of Moments
+
+First we will use the bootstrap to find the estimated standard errors of the estimated parameters from the Method of Moments estimation. 
+```{r mom se}
+# Put down our estimates from MOM
+alpha0 <- alpha_hat
+lambda0 <- lambda_hat
+
+# Number of samples to create
+N <- 10000
+
+# Sample size
+n <- length(df$times)
+
+# Get our estimates
+set.seed(999)
+estimates <- replicate(N, {
+  sim_data <- rgamma(n, shape = alpha0, rate = lambda0)
+  ybar <- mean(sim_data)
+  s2 <- mean(sim_data^2) - ybar^2
+  alpha_hat_sim <- ybar^2 / s2
+  lambda_hat_sim <- ybar / s2
+  return(c("alpha_hat" = alpha_hat_sim, "lambda_hat" = lambda_hat_sim))
+})
+
+# SE(alpha_hat)
+se_mom_alpha_hat <- sd(estimates[1, ])
+
+# SE(lambda_hat)
+se_mom_lambda_hat <- sd(estimates[2, ])
+
+# Show them together
+c(se_mom_alpha_hat, se_mom_lambda_hat)
+```
+
+Using Method of Moments Estimation we can see that our standard error of $\hat{\alpha}_{MOM}$ is equal to `r se_mom_alpha_hat` and our standard error of $\hat{\lambda}_{MOM}$ is equal to `r se_mom_lambda_hat`.
+
+## Maximum Likelihood Estimation
+
+First we will use the bootstrap to find the estimated standard errors of the estimated parameters from the Maximum Likelihood Estimation.
+```{r mle se}
+# Put down our estimates from MLE
+alpha0 <- alpha_mle
+lambda0 <- lambda_mle
+
+# Number of samples to create
+N <- 10000
+
+# Sample size
+n <- length(df$times)
+
+# Get our estimates
+set.seed(999)
+estimates <- replicate(N, {
+  sim_data <- rgamma(n, shape = alpha0, rate = lambda0)
+  ybar <- mean(sim_data)
+  s2 <- mean(sim_data^2) - ybar^2
+  alpha_hat_sim <- ybar^2 / s2
+  lambda_hat_sim <- ybar / s2
+  return(c("alpha_hat" = alpha_hat_sim, "lambda_hat" = lambda_hat_sim))
+})
+
+# SE(alpha_hat)
+se_mle_alpha_hat <- sd(estimates[1, ])
+
+# SE(lambda_hat)
+se_mle_lambda_hat <- sd(estimates[2, ])
+
+# Show them together
+c(se_mle_alpha_hat, se_mle_lambda_hat)
+```
+
+Using Maximum Likelihood Estimation we can see that our standard error of $\hat{\alpha}_{MLE}$ is equal to `r se_mle_alpha_hat` and our standard error of $\hat{\lambda}_{MLE}$ is equal to `r se_mle_lambda_hat`.
+
+## Comparison
+
+Here we can compare both estimation methods via a table to look at their respective standard errors.
+
+|Estimation | $\hat{SE}(\hat{\alpha})$ | $\hat{SE}(\hat{\lambda})$ |
+|:------|:------:|--------:|
+|Method of Moments | `r se_mom_alpha_hat` | `r se_mom_lambda_hat` |
+|Maximum Likelihood | `r se_mle_alpha_hat` | `r se_mle_lambda_hat` |
+
+As we can see here, the standard errors for both $\hat{\alpha}$ and $\hat{\lambda}$ are lower when using Method of Moments Estimation over Maximum Likelihood Estimation. Therefore, we can say that Method of Moments Estimation is better to use for estimating parameters if using this gamma distribution for this specific data. Note how both values are extremely close though and really both seem to do about the same (with Method of Moments ever so slightly better with the lower standard errors).

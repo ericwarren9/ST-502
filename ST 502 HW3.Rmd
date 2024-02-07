@@ -204,11 +204,7 @@ n <- length(df$times)
 set.seed(999)
 estimates <- replicate(N, {
   sim_data <- rgamma(n, shape = alpha0, rate = lambda0)
-  ybar <- mean(sim_data)
-  s2 <- mean(sim_data^2) - ybar^2
-  alpha_hat_sim <- ybar^2 / s2
-  lambda_hat_sim <- ybar / s2
-  return(c("alpha_hat" = alpha_hat_sim, "lambda_hat" = lambda_hat_sim))
+  return(fitdistr(sim_data, "gamma")[[1]])
 })
 
 # SE(alpha_hat)
@@ -232,4 +228,4 @@ Here we can compare both estimation methods via a table to look at their respect
 |Method of Moments | `r se_mom_alpha_hat` | `r se_mom_lambda_hat` |
 |Maximum Likelihood | `r se_mle_alpha_hat` | `r se_mle_lambda_hat` |
 
-As we can see here, the standard errors for both $\hat{\alpha}$ and $\hat{\lambda}$ are lower when using Method of Moments Estimation over Maximum Likelihood Estimation. Therefore, we can say that Method of Moments Estimation is better to use for estimating parameters if using this gamma distribution for this specific data. Note how both values are extremely close though and really both seem to do about the same (with Method of Moments ever so slightly better with the lower standard errors).
+As we can see here, the standard errors for both $\hat{\alpha}$ and $\hat{\lambda}$ are lower when using Maximum Likelihood Estimation over Method of Moments Estimation. Therefore, we can say that Maximum Likelihood Estimation is better to use for estimating parameters if using this gamma distribution for this specific data. However we must decide if this precision by Maximum Likelihood Estimation outweighs its computational cost (as it takes longer to bootstrap values).

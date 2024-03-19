@@ -151,18 +151,18 @@ Now we are going to go through and set up functions for our posterior.
 ```{r posterior function}
 # calculate p
 expit <- function(X, beta0, beta1) {
-  return( 1/(1 + exp(-beta0 - beta1*X)) )
+  1/(1 + exp(-beta0 - beta1*X))
 }
 
 # log prior for beta
 log_prior <- function(beta, mean = 0, sd = 15) {
-  return( -0.5*(log(sd^2) + (beta - mean)^2/sd^2) )
+  -0.5*(log(sd^2) + (beta - mean)^2/sd^2)
 }
 
 # log posterior
 log_post <- function(Y, X, beta0, beta1){
   P <- expit(X, beta0, beta1)
-  return( sum(Y*log(P) + (1-Y)*log(1-P)) + logprior(beta0) + logprior(beta1) )
+  sum(Y*log(P) + (1-Y)*log(1-P)) + log_prior(beta0) + log_prior(beta1)
 }
 ```
 
@@ -225,8 +225,6 @@ mcmc_sampler <- function(Y, X, N = 100000, beta0_init = 0,
       beta1 = beta1
     )
   }
-  
-  print("Last values accepted: (beta0, beta1) = ({beta0}, {beta1})")
   
   # return all betas
   return(df)

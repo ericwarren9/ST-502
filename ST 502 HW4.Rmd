@@ -1,0 +1,343 @@
+---
+title: "ST 502 Homework 4"
+author: "Eric Warren"
+date: "`r Sys.Date()`"
+urlcolor: blue
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.pos = "H", fig.show = "hold", out.extra = "")
+options(scipen = 999)
+```
+
+```{r output setup, eval=FALSE, echo=FALSE}
+# This code allows us to render a pdf document
+rmarkdown::render("~/ST-502/ST 502 HW4.Rmd", 
+              output_format = "pdf_document", 
+              output_options = list(
+                toc = TRUE, 
+                toc_depth = 3,
+                number_sections = TRUE,
+                extra_dependencies = "float"
+                )
+              )
+```
+
+# Problem 8.4 E
+
+If the prior distribution of $\Theta$ is uniform on [0, 1], what is the posterior density? Plot it. What is the mode of the posterior?
+
+\begin{figure}[H]
+\includegraphics{ST 502 HW4-1.png}
+\caption{Work for 8.4 E}
+\end{figure}
+
+Work is done on first page, but code for graph is shown below.
+```{r problem 1}
+plot(
+  seq(0, 1, length = 100), 
+  dbeta(seq(0, 1, length = 100), 6, 6), 
+  type = "l",
+  main = "Sketch of Posterior Density (Beta(6, 6))\n for Problem 8.4 E",
+  xlab = "theta",
+  ylab = "Density"
+)
+```
+
+# Problem 8.42
+
+For each of 100 sequential time intervals of variable lengths (given in seconds), the number of gamma rays originating in a particular area of the sky was recorded. Assuming a model that the arrival times are a Poisson process with constant emission rate ($\lambda$ = events per second), estimate $\lambda$. What is the estimated standard error? How might you informally check the assumption that the emission rate is constant? What is the posterior distribution of $\Lambda$ if an improper gamma prior is used?
+
+First, we should read in the data which is done below showing the first couple of observations.
+```{r problem 2 read in}
+library(tidyverse)
+(rays <- read_csv("gamma-ray.csv"))
+
+# Sum number of seconds
+sum(rays$seconds)
+
+# Sum number of count
+sum(rays$count)
+```
+
+Now, The parameter $\lambda$ (which is the number of 
+events per second) can be estimated as a ratio of the total number of events to the sum of lengths of all 100 intervals. So we obtain an estimate of since the total duration of recording was `r sum(rays$seconds)` seconds, and during that time, `r sum(rays$count)` gamma rays were observed. So $\hat{\lambda} =$ `r sum(rays$count)` / `r sum(rays$seconds)` $\approx$ `r round(sum(rays$count) / sum(rays$seconds), 4)`. 
+
+We can also find the estimated standard error for this to be $SE(\hat{\lambda}) = \sqrt{\frac{\hat{\lambda}}{n}} = \sqrt{\frac{0.0039}{15718.2}} =$ `r round(sqrt(.0039/15718.2), 4)`. We act as if $n = 15718.2$ is the total length of all 100 time intervals (as each second is one trial or one sampled unit).
+
+To check to see if our emission rate is constant we can split up the intervals into 5 groups (do 1-20, 21-40, etc. up to 81-100) and see if their average emission rates are about the same. We can do this below and then show a table of the average emission results.
+```{r problem 2 average means tables}
+# Get list of interval values
+Interval <- c("1-20", "21-40", "41-60", "61-80", "81-100")
+
+# Get average values from each interval 
+value_table <- rays %>% 
+  mutate(index = ceiling(seq_len(n())/20)) %>% 
+  group_by(index, add = T) %>% 
+  summarise(`Average Emission` = round(mean(sum(count) / sum(seconds)), 5))
+
+# Combine into a data frame
+values_avg <- cbind(Interval, value_table) %>%
+  dplyr::select(- index)
+
+# Display table
+knitr::kable(values_avg)
+```
+
+Since we can see that our averages in the final column are not that far from our estimate $\hat{\lambda}$, we can say that this is a clue that the emission rate could actually be constant; however, this surely doesn't prove the claim.
+
+Since we are given the prior distribution, we can now find the posterior distribution of $\Lambda$. Note an improper gamma is defined as $f_{\Lambda}(\lambda) = \frac{1}{\lambda}, 0 < \lambda < \infty$ and note the density does not integrate to 1. 
+
+Now note to find our posterior that $f_{\Lambda | X}(\lambda | x) = \frac{f_{X | \Lambda}(x | \lambda) * f_{\Lambda}(\lambda)}{f_X(x)}$. We can say that $f_{X | \Lambda}(x | \lambda) = \frac{(\lambda t_1)^{x_1} e^{- \lambda t_1}}{x_1 !} * ... * \frac{(\lambda t_n)^{x_n} e^{- \lambda t_n}}{x_n !} = \frac{t_1^{x_1} * t_n^{x_n}}{x_1 ! * ... * x_n !} \lambda^{x_1 + ... + x_n} e^{- \lambda (t_1 + ... + t_n)}$ where $n = 100$ is the number of time trials, $t_i$ is the length of our i-th time interval, and $x_i$ is the number of observed gamma rays in our i-th interval. 
+
+Lastly, we need to find $f_X(x) = \int f_{X|\Lambda}(x|\lambda) f_{\Lambda}(\lambda) d\lambda = \int_0^\infty \frac{t_1^{x_1} * ... * t_n^{x_n}}{x_1 ! * ... * x_n !} \lambda^{x_1 + ... + x_n} e^{- \lambda (t_1 + ... + t_n)} \frac{1}{\lambda} d\lambda = \int_0^\infty \frac{t_1^{x_1} * ... * t_n^{x_n}}{x_1 ! * ... * x_n !} \lambda^{x_1 + ... + x_n - 1} e^{- \lambda (t_1 + ... + t_n)} d\lambda$ using what we know about $f_\Lambda(\lambda)$.
+
+Note the property that $\int_0^\infty x^{a-1} e^{-\lambda x} dx = \frac{\Gamma(a)}{\lambda^a}$. Using this to our integral, we can say that $f_X(x) = \int_0^\infty \frac{t_1^{x_1} * t_n^{x_n}}{x_1 ! * ... * x_n !} \lambda^{x_1 + ... + x_n - 1} e^{- \lambda (t_1 + ... + t_n)} d\lambda = \frac{t_1^{x_1} * ... * t_n^{x_n}}{x_1 ! * ... * x_n !} \frac{\Gamma(x_1 + ... + x_n)}{(t_1 + ... + t_n)^{x_1 + ... + x_n}}$.
+
+Now plugging in our values we can see that $f_{\Lambda | X}(\lambda | x) = \frac{f_{X | \Lambda}(x | \lambda) * f_{\Lambda}(\lambda)}{f_X(x)} = \frac{\frac{t_1^{x_1} * t_n^{x_n}}{x_1 ! * ... * x_n !} \lambda^{x_1 + ... + x_n - 1} e^{- \lambda (t_1 + ... + t_n)}}{\frac{t_1^{x_1} * ... * t_n^{x_n}}{x_1 ! * ... * x_n !} \frac{\Gamma(x_1 + ... + x_n)}{(t_1 + ... + t_n)^{x_1 + ... + x_n}}} = \frac{(t_1 + ... + t_n)^{x_1 + ... + x_n}}{\Gamma(x_1 + ... + x_n)} \lambda^{x_1 + ... + x_n - 1} e^{- \lambda (t_1 + ... + t_n)}$. We can recognize this as a gamma density which has the parameters $\alpha = x_1 + ... x_k = 61$ and $\beta = t_1 + ... t_n = 15718.2$. So our posterior distribution is $\Lambda | X \sim gamma(61, 15718.2)$.
+
+# Problem 8.63
+
+\begin{figure}[H]
+\includegraphics{ST 502 HW4-2.png}
+\caption{Work for 8.63}
+\end{figure}
+
+Here we can make the plot of our posterior distributions.
+```{r problem 3 plots}
+# Get sequence lengths for plots
+seq_length <- seq(0, 0.2, length = 100)
+
+# Make first plot where a = b = 1
+plot(
+  seq_length, 
+  dbeta(seq_length, 4, 98), 
+  type = "l",
+  col = "red",
+  main = "Sketch of Posterior Densities for Problem 8.63",
+  xlab = "theta",
+  ylab = "Density",
+  ylim = c(0, 27)
+)
+lines(
+  seq_length, 
+  dbeta(seq_length, 3.5, 102),
+  col = "green",
+)
+legend(
+  "topright",
+  legend = c("First Posterior", "Second Posterior"),
+  fill = c("red","green")
+)
+```
+
+# Problem 8.65
+
+\begin{figure}[H]
+\includegraphics{ST 502 HW4-3.png}
+\caption{Work for 8.65}
+\end{figure}
+
+# Extra Problem 
+
+Here we are going to create a MCMC to create our own posterior distribution. We are going to do this using logistic regression. First we are going to read in the data.
+```{r last problem read in}
+(diabetes <- read_csv("diabetes-dataset.csv"))
+```
+
+Now we are going to go through and set up functions for our posterior.
+```{r posterior function}
+# calculate p
+expit <- function(X, beta0, beta1) {
+  return( 1/(1 + exp(-beta0 - beta1*X)) )
+}
+
+# log prior for beta
+log_prior <- function(beta, mean = 0, sd = 15) {
+  return( -0.5*(log(sd^2) + (beta - mean)^2/sd^2) )
+}
+
+# log posterior
+log_post <- function(Y, X, beta0, beta1){
+  P <- expit(X, beta0, beta1)
+  return( sum(Y*log(P) + (1-Y)*log(1-P)) + logprior(beta0) + logprior(beta1) )
+}
+```
+
+Now I am going to go through and make a MCMC sampler function that will help with choosing the betas we want to keep and end up giving us an estimate of both $\beta_0$ and $\beta_1$ when we are all said and done.
+```{r mcmc sampler function}
+# MCMC sampler function
+mcmc_sampler <- function(Y, X, N = 100000, beta0_init = 0, 
+                         proposed_sd0 = 0.009, beta1_init = 0, proposed_sd1 = 0.009) {
+  
+  # make the simulation reproducible
+  set.seed(999)
+  
+  # set up a data frame to store beta0 and beta1
+  df <-  tibble(
+    beta0 = beta0_init, 
+    beta1 = beta1_init
+  )
+  
+  # current step - initialize our beta values
+  beta0 <- beta0_init
+  beta1 <- beta1_init
+  
+  # log posterior for the current step in simulation
+  log_post_sim <- log_post(Y, X, beta0, beta1)
+  
+  # iteration
+  for (i in 2:N) {
+    
+    # beta0: pick a new candidate 
+    beta0_new <- rnorm(1, beta0, proposed_sd0)
+    
+    # new log posterior for beta0
+    log_post_sim_new <- log_post(Y, X, beta0_new, beta1)
+    
+    # decide whether to accept or reject the new beta0 candidate
+    lnR <- log_post_sim_new - log_post_sim
+    lnU <- log(runif(1))
+    if(lnR > lnU){ 
+      beta0 <- beta0_new 
+      log_post_sim <- log_post_sim_new
+    }
+    
+    # beta1: pick a new candidate 
+    beta1_new <- rnorm(1, beta1, proposed_sd1)
+    
+    # New log posterior for beta1
+    log_post_sim_new <- log_post(Y, X, beta0, beta1_new)
+    
+    # Decide whether to accept or reject the new beta1 candidate
+    lnR <- log_post_sim_new - log_post_sim
+    lnU <- log(runif(1))
+    if(lnR > lnU){ 
+      beta1 <- beta1_new 
+      log_post_sim <- log_post_sim_new
+    }
+    
+    # save betas to our data frame to use for graphing for later
+    df <- df %>% add_row(
+      beta0 = beta0, 
+      beta1 = beta1
+    )
+  }
+  
+  print("Last values accepted: (beta0, beta1) = ({beta0}, {beta1})")
+  
+  # return all betas
+  return(df)
+}
+```
+
+Now that we have our MCMC sampler function, we can go through and make another function to find a way to burn in (or remove the first so many observations that we think might be inaccurate) and also use our previous data frame to go through and get important statistics like the posterior mean, median, and credible intervals. Before that though I am going to make a function that will be used for our final plots and then do our summary of MCMC function.
+```{r make function to get stats}
+# Used to format the text correctly
+library(gt)
+library(glue)
+
+# summarize a distribution (graphically and numerically)
+summary_dist <- function(x, var_expression, pos_x = 0, pos_y = 1, adj = c(0, 1), conf_level = 0.95, plot = TRUE, ...){
+  
+  # significance level
+  alpha <- (1 - conf_level) / 2
+  
+  # mean, median, and intervals
+  mean <- mean(x)
+  median <- median(x)
+  sd <- sd(x)
+  CI <- quantile(x, probs = c(alpha, 1 - alpha)) %>%
+    `names<-`(vec_fmt_percent(c(alpha, 1 - alpha), decimals = 1))
+
+  if(plot){
+    # plot distributions with annotations of mean, median and credible intervals (equal tail)
+    hist_obj <- hist(
+      x, 
+      probability = T, 
+      col = NULL,
+      yaxt = "n",
+      xlab = var_expression, 
+      main = paste("Histogram of\n MCMC Beta Values"))
+    
+    # add lines to plots
+    abline(v = mean, col = "red", lwd = 2)
+    abline(v = median, col = "blue", lwd = 2)
+    abline(v = CI)
+    
+    # annotation
+    text(
+      quantile(hist_obj$breaks, probs = pos_x),
+      quantile(hist_obj$density, probs = pos_y),
+      glue(
+        "Mean = {signif(mean, 4)}\n",
+        "Median = {signif(median, 4)}\n",
+        "Std = {signif(sd, 4)}\n",
+        "{conf_level*100}% CI: ({toString(signif(CI, 4))})"
+      ),
+      adj = adj, ...)
+  }
+  
+  # return summaries
+  return(tibble(
+    mean = mean,
+    median = median,
+    sd = sd,
+    CI = list(CI)
+  ))
+}
+
+# Do MCMC Summary function
+summary_of_mcmc <- function(df, burn_in = 10000, ...){
+  
+  # Number of MCMC samples
+  N <- nrow(df)
+  
+  # remove burn-in rows
+  df2 <- tail(df, - burn_in)
+
+  # plot distributions of betas with annotations of mean, median and our credible intervals
+  par(mfrow = c(1,2))
+  beta0 <- summary_dist(df2$beta0, var_expression = expression(beta[0]), ...)
+  beta1 <- summary_dist(df2$beta1, var_expression = expression(beta[1]), ...)
+  
+  # reset par options
+  par(mfrow = c(1,1))
+  
+  # combine betas and report intervals, process time and acceptance rate
+  bind_rows(list(beta0 = beta0, beta1 = beta1), .id = "term") %>% 
+    unnest_wider(CI, names_sep = "_")
+}
+```
+
+Now that we have all of our functions we can get our initial data frame and then do our get the information we want with our last function.
+```{r get bayes results}
+# Get the data frame of values from MCMC
+df_mcmc <- mcmc_sampler(Y = diabetes$Outcome, X = diabetes$Glucose)
+
+# Get the summary of our MCMC sampler
+(mcmc_results <- summary_of_mcmc(df = df_mcmc))
+```
+
+We can see here that we get some important values to note for each of our beta's.
+
+- For $\beta_0$ we get a mean and median around -5.28 with a standard deviation of around 0.232 which gets us 95% credible intervals (this is what CI stands for in this case) of roughly -5.71 and -4.83. 
+- For $\beta_1$ we get a mean and median around 0.0369 with a standard deviation of around 0.00178 which gets us 95% credible intervals (this is what CI stands for in this case) of roughly 0.0335 and 0.0402.
+
+Let us see how this compares to the Frequentest view of creating a GLM with a logit function as the linking function and then getting 95% confidence intervals of that.
+```{r 95 ci frequentist}
+# Create the fit of this GLM
+fit <- glm(Outcome ~ Glucose, 
+           family = binomial(link = "logit"), 
+           data = diabetes)
+
+# Show the summary
+summary(fit)
+
+# Get the 95% confidence intervals
+confint(fit)
+```
+
+As we can see the values we get for our estimates and confidence (or credible) intervals are basically the same value whether we do this via Bayesian MCMC or the Frequentest GLM modeling. 

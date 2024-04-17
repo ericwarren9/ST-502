@@ -1,0 +1,80 @@
+---
+title: "ST 502 Final Project"
+author: "Eric Warren"
+date: "`r Sys.Date()`"
+urlcolor: blue
+header-includes:
+  - \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.pos = "H", fig.show = "hold", out.extra = "")
+options(scipen = 999)
+```
+
+```{r output setup, eval=FALSE, echo=FALSE}
+# This code allows us to render a pdf document
+rmarkdown::render("~/ST-502/Warren_ST 502 Final.Rmd", 
+              output_format = "pdf_document", 
+              output_options = list(
+                toc = TRUE, 
+                toc_depth = 3,
+                number_sections = TRUE,
+                extra_dependencies = "float"
+                )
+              )
+```
+
+# Introduction
+
+In this report we are going to use something called the [NcNemar's Test](https://www.ncbi.nlm.nih.gov/books/NBK560699/#:~:text=The%20McNemar%20test%20is%20a,variable%20with%20two%20dependent%20groups.). This test looks at a 2 x 2 contingency table and checks the marginal homogeneity of two opposite variables (and in the case we are going to look at two competing drugs). The test requires one categorical variable with two competing categories (in our case two different, competing drugs) and one independent variable with two dependent groups (in our case the subjects participating in the study who are split into two different groups). The NcNemar's Test is typically used in experimental design which looks at how subjects react a treatment versus some kind of control group or two competing treatments to see which one subjects react better to. The types of data being collected will be in the form of a matched pairs design where the subjects will experience both options to compare results on how well their response is. Then we will perform the analysis doing a hypothesis test saying our null hypothesis is how both treatments have the same effect on subjects and the alternative is how treatment 1 is either better, worse, or not equal to treatment 2. This report will explain more in depth how this NcNemar's Test is used in practice.
+
+# Analyzing our Data
+
+Here we are going to consider a dataset on 250 subjects in which acid reflux is treated by a drug. The response is either success (reflux stopped) or failure (reflux still present). Half of the subjects are randomly selected to use drug A the first day they have reflux and drug B the second day they have reflux. The others were assigned to use drug B first, then drug A. We want to know if the drugs have a different probability of successful relief. The outcomes for the relief given by the drugs is given in the table below.
+
+|Drug | Success | Failure | Total | 
+|:-----:|:-----:|:-----:|:-----:|
+|A | 100 | 150 | 250 |
+|B | 125 | 125 | 250 | 
+|Total | 225 | 275 | 500 | 
+
+However, we wouldn’t want to analyze this data with a test of homogeneity because the observations in the table are not independent. In this situation, we really only have 250 subjects, which means we really do not have 500 independent observations. Instead, we can look at a table of concordant and discordant pairs.
+
+| | Drug A Success | Drug A Failure | Total | 
+|:-----:|:-----:|:-----:|:-----:|
+|Drug B Success | 85 | 15 | 100 |
+|Drug B Failure | 40 | 110 | 150 | 
+|Total | 125 | 125 | 250 |
+
+The diagonal now represents the observations that were the same for an individual (concordant pairs). The off diagonals represent observations that were not the same for individuals (discordant pairs). To test whether or not the drugs have a different effect, we can now apply McNemar’s test on the table of concordant/discordant pairs.
+
+Our null hypothesis is that there is no relationship between drug and relief with the alternative hypothesis being that the null hypothesis is not true in some way (we say that the cell probabilities are "free" -- other than the sum to 1 as the constraint). Please note here to do the test we will use Pearson’s Chi-Square test statistic (call it $X^2$), which can be found by $X^2 = \sum_{i = 1}^2 \sum_{j = 1} ^ 2 \frac{(Obs_{ij} - Exp_{ij})^2}{Exp_{ij}} = \frac{(n_{12} - n_{21})^2}{n_{12} + n_{21}}$ where where $n_{ij}$ represents the observed count in cell ij. (You’ll show this later on.) Our reference distribution is a $\chi_1^2$. This test can be done in **R** using the `mcnemar.test()` function from the `stats` package. 
+
+First, we are going to find the value of the test statistic, the rejection region, and the p-value of the test using R. Note here we will say our significance level $\alpha = 0.05$, our test statistic is $X^2 =  \frac{(n_{12} - n_{21})^2}{n_{12} + n_{21}}$, our rejection region is $\{t_{obs} : t_{obs} > \chi_{1, .05}^2\}$, and our p-value is $P(\chi_1^2 \ge X^2)$.
+```{r}
+# Get the n21 and n12 values
+n21 <- 40
+n12 <- 15
+
+# Get the Pearson Chi-sq test stat
+chi_sq_test_stat <- ((n12 - n21) ** 2) / (n12 + n21)
+
+
+# Get the critical value to compare for our rejection region
+critical_value <- qchisq(0.95, 1)
+
+# Find the p-value
+p_value <- pchisq(chi_sq_test_stat, 1, lower.tail = F)
+```
+
+In the case of our experiment and if we say that $\alpha = 0.05$, we can say our test statistic $X^2 =  \frac{(n_{12} - n_{21})^2}{n_{12} + n_{21}} =$ `r round(chi_sq_test_stat, 4)`, our rejection region of $\{t_{obs} : t_{obs} > \chi_{1, .05}^2\}$ becomes {$t_{obs} : t_{obs} >$ `r round(critical_value, 4)`}, and our p-value shown by $P(\chi_1^2 \ge X^2)$ is `r round(p_value, 4)`. Based on these results, we can say that we have statistically significant evidence to reject the null hypothesis which said there was no relationship between drug and relief. That means with statistically significant evidence we can say a relationship between drug and relief is present. We are going to double check this using our `mcnemar.test()` function to make sure our results are the same.
+```{r}
+# Make the matrix
+df <- matrix(c(85, 40, 15, 110), nrow = 2, ncol = 2)
+
+# Do the mcnemar test
+test <- mcnemar.test(df, correct = FALSE)
+```
+
+Using the McNemar's Test, we get our test-statistic to be `r round(test$statistic[[1]], 4)` with `r test$df[[1]]` degree of freedom and a p-value of `r round(test$p.value[[1]], 4)`. This matches up with the results we got from before our rejecting our null hypothesis and having statistically significant evidence to say a relationship between drug and relief is present.

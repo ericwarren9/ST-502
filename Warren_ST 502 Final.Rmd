@@ -109,7 +109,7 @@ Here we can say that $X^2 = \sum_{i = 1}^2 \sum_{j = 1}^2 \frac{(Obs_{ij} - Exp_
 
 Sometimes we might like to know how well our statistical testing does at detecting certain alternatives (which is what we would call its power). While we can try to derive these things, there are times that the derivations are too difficult so instead we use simulation based methods which will provide a nice method for finding approximate results. In this section, we are going to investigate if we control for $\alpha$, how well does our Pearson chi-square test identify alternative hypotheses when they are present and should be selected (or really reject our null hypothesis). This is what we refer to as the test's power. In this case of the simulation, we are going to set $\alpha = 0.05$ since this is a standard control for Type I Error. 
 
-The first thing we are going to do in our simulation is to make a function that will take in a value of sample size (n), our $\pi_1$ value which is the mean of success for drug A, our $\pi_2$ value which is the mean of success for drug B, and the correlation between our data will be generated on. The function will then go through and make 1000 different 2x2 data sets that will have a McNemar's Test conducted on each. We then will look at the proportion of tests rejected, which is what this function will return for whatever combination of values inputted.
+The first thing we are going to do in our simulation is to make a function that will take in a value of sample size (n), our $\pi_1$ value which is the mean of success for drug A, our $\pi_2$ value which is the mean of success for drug B, and the correlation between our data will be generated on. The function will then go through and make 1000 different 2x2 data sets that will have a McNemar's Test conducted on each. One thing to note here is that with small sample sizes we might get our off diagonal values to be 0 for each indice, which would give us a test statistic of `NA` (and a `NA` test result). Since off diagonals of 0 mean no difference, we will call these tests "fail to reject" (denoted as `FALSE`). We then will look at the proportion of tests rejected, which is what this function will return for whatever combination of values inputted.
 ```{r}
 # Import library needed to run simulation
 library(MultiRNG)
@@ -168,8 +168,12 @@ get_results <- function(n, pi1, pi2, correlation) {
     # TRUE is rejected and FALSE is fail to reject
     mcnemar.test(data, correct = FALSE)$p.value <= 0.05
   })
+  # Change all NA values to FALSE since off diagonals are 0 for each
+  # So fail to reject would have been result
+  test_results <- ifelse(is.na(test_results), FALSE, test_results)
+  
   # After getting 1000 simulated results get a proportion rejections
-  mean(test_results, na.rm = TRUE)
+  mean(test_results)
 }
 ```
 
